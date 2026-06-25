@@ -311,6 +311,11 @@ class GroqSwitcherApp(App):
         self._build_accounts_table()
         self._populate_accounts_table()
         self._load_models_async()
+        self.query_one("#btn-refresh", Button).tooltip = (
+            "Refresh latest quota for the selected model in the table.\n"
+            "Model selection in the table will not take effect in your chat. "
+            'You need to explicitly ask Groq to use a specific model (e.g. "use llama-3.3-70b").'
+        )
 
     def _load_models_async(self) -> None:
         key = get_current_key()
