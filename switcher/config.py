@@ -1,4 +1,4 @@
-__doc__ = """
+"""
 Configuration helpers for the Groq Account Switcher.
 
 Manages reading/writing GROQ_API_KEY in four target config files:
