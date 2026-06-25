@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 import threading
 from datetime import datetime
 from typing import Any
@@ -226,11 +227,12 @@ class GroqSwitcherApp(App):
     BINDINGS = [
         Binding("q", "quit", "Quit"),
         Binding("r", "refresh", "Refresh"),
+        Binding("ctrl+c", "copy", "Copy", priority=True),
         Binding("tab", "focus_next", "Next"),
     ]
 
     DEFAULT_CSS = """
-    Screen { layout: vertical; }
+    Screen { layout: vertical; align: left top; }
 
     #toolbar {
         height: 3;
@@ -250,7 +252,9 @@ class GroqSwitcherApp(App):
         color: $text-muted;
     }
 
-    DataTable { height: 9; }
+    #tbl-models { height: 9; }
+    #tbl-accounts { height: auto; max-height: 12; }
+    #spacer { height: 1fr; }
 
     #status {
         height: 1;
@@ -258,6 +262,7 @@ class GroqSwitcherApp(App):
         background: $panel;
         color: $text-muted;
     }
+    #copy-bar { height: 1; }
     """
 
     def __init__(self) -> None:
@@ -266,6 +271,7 @@ class GroqSwitcherApp(App):
         self._model_type: str = "llm"
         self._selected_model_row: int = 0
         self._selected_account_row: int = 0
+        self._copy_value: str = ""
 
     # ------------------------------------------------------------------
     # Compose
@@ -288,9 +294,11 @@ class GroqSwitcherApp(App):
             yield Button("Refresh", id="btn-refresh")
             yield Button("Refresh All", id="btn-refresh-all")
         yield Static("Models", id="models-label")
-        yield DataTable(id="tbl-models", cursor_type="row", zebra_stripes=False)
+        yield DataTable(id="tbl-models", cursor_type="cell", zebra_stripes=False)
         yield Static("Accounts", id="accounts-label")
         yield DataTable(id="tbl-accounts", cursor_type="row", zebra_stripes=False)
+        yield Static("", id="spacer")
+        yield Input(id="copy-bar", compact=True)
         yield Static("Ready.", id="status")
         yield Footer()
 
@@ -380,7 +388,7 @@ class GroqSwitcherApp(App):
     def _build_accounts_table(self) -> None:
         tbl: DataTable = self.query_one("#tbl-accounts", DataTable)
         tbl.clear(columns=True)
-        tbl.add_columns(" ", "Name", "Key (masked)", "Last used")
+        tbl.add_columns(" ", "Name", "Key (masked)", "Last used", "Status")
 
     def _populate_accounts_table(self) -> None:
         tbl: DataTable = self.query_one("#tbl-accounts", DataTable)
@@ -391,13 +399,12 @@ class GroqSwitcherApp(App):
         active = get_active_account_name() or data.get("active")
         for acc in data.get("accounts", []):
             name = acc.get("name", "")
-            sel = "●" if name == active else "○"
+            is_active = name == active
+            sel = "●" if is_active else "○"
             masked = mask_key(acc.get("key", ""))
-            if name == active:
-                last = "(active)"
-            else:
-                last = _fmt_dt(acc.get("last_used"))
-            tbl.add_row(sel, name, masked, last)
+            last = _fmt_dt(acc.get("last_used"))
+            status = "active" if is_active else ""
+            tbl.add_row(sel, name, masked, last, status)
 
     def _get_selected_account(self) -> dict | None:
         tbl: DataTable = self.query_one("#tbl-accounts", DataTable)
@@ -418,6 +425,12 @@ class GroqSwitcherApp(App):
     # Table events
     # ------------------------------------------------------------------
 
+    def on_data_table_cell_highlighted(self, event: DataTable.CellHighlighted) -> None:
+        if event.data_table.id == "tbl-models":
+            self._copy_value = str(event.value) if event.value is not None else ""
+            self._set_status(f"Selected: {self._copy_value}")
+            self.query_one("#copy-bar", Input).value = self._copy_value
+
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         tbl = event.data_table
         if tbl.id == "tbl-models":
@@ -425,6 +438,12 @@ class GroqSwitcherApp(App):
             self._refresh_model_sel_column()
         elif tbl.id == "tbl-accounts":
             self._selected_account_row = event.cursor_row
+
+    def on_data_table_cell_selected(self, event: DataTable.CellSelected) -> None:
+        tbl = event.data_table
+        if tbl.id == "tbl-models":
+            self._selected_model_row = event.coordinate.row
+            self._refresh_model_sel_column()
 
     def _refresh_model_sel_column(self) -> None:
         tbl: DataTable = self.query_one("#tbl-models", DataTable)
@@ -457,9 +476,24 @@ class GroqSwitcherApp(App):
             self._build_models_table()
             self._populate_models_table()
 
+    def on_input_changed(self, event: Input.Changed) -> None:
+        if event.input.id == "copy-bar":
+            self._copy_value = event.value
+
     # ------------------------------------------------------------------
     # Key bindings
     # ------------------------------------------------------------------
+
+    def action_copy(self) -> None:
+        text = self._copy_value
+        if not text:
+            self._set_status("Nothing to copy.")
+            return
+        try:
+            subprocess.run(["clip"], input=text.encode("utf-8"), check=False)
+            self._set_status(f"Copied: {text}")
+        except Exception as e:
+            self._set_status(f"Copy failed: {e}")
 
     def action_refresh(self) -> None:
         key = get_current_key()
@@ -517,6 +551,13 @@ class GroqSwitcherApp(App):
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
         if event.data_table.id == "tbl-accounts":
             self._selected_account_row = event.cursor_row
+            try:
+                row = event.data_table.get_row_at(event.cursor_row)
+                self._copy_value = str(row[1]) if len(row) > 1 else ""
+                self._set_status(f"Selected: {self._copy_value}")
+                self.query_one("#copy-bar", Input).value = self._copy_value
+            except Exception:
+                pass
 
     def action_switch_selected(self) -> None:
         acc = self._get_selected_account()

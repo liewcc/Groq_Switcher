@@ -28,7 +28,7 @@ import httpx
 
 ACCOUNTS_FILE = Path(__file__).parent.parent / "accounts.json"
 
-TARGET_DOTENV = Path(r"D:\AI\groq-mcp-server\.env")
+TARGET_DOTENV = Path(r"D:\AI\groq-agentic-mcp\.env")
 
 TARGET_JSON_FILES: List[dict[str, Any]] = [
     {
