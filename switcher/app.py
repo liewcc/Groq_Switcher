@@ -438,6 +438,7 @@ class GroqSwitcherApp(App):
             self._refresh_model_sel_column()
         elif tbl.id == "tbl-accounts":
             self._selected_account_row = event.cursor_row
+            self.action_switch_selected()
 
     def on_data_table_cell_selected(self, event: DataTable.CellSelected) -> None:
         tbl = event.data_table
@@ -581,12 +582,6 @@ class GroqSwitcherApp(App):
             for i in range(tbl.row_count):
                 tbl.update_cell_at((i, 4), "—")
                 tbl.update_cell_at((i, 5), "—")
-
-    def on_key(self, event) -> None:
-        focused = self.focused
-        if focused and getattr(focused, "id", None) == "tbl-accounts":
-            if event.key == "enter":
-                self.action_switch_selected()
 
     # ------------------------------------------------------------------
     # CRUD modals
