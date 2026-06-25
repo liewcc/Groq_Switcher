@@ -301,6 +301,7 @@ class GroqSwitcherApp(App):
     def on_mount(self) -> None:
         self._build_models_table()
         self._build_accounts_table()
+        self._populate_accounts_table()
         self._load_models_async()
 
     def _load_models_async(self) -> None:
@@ -385,7 +386,9 @@ class GroqSwitcherApp(App):
         tbl: DataTable = self.query_one("#tbl-accounts", DataTable)
         tbl.clear()
         data = load_accounts()
-        active = data.get("active")
+        # Derive active account from current .env key, not just the stored "active" field,
+        # so accounts added before any switch() call still show correctly.
+        active = get_active_account_name() or data.get("active")
         for acc in data.get("accounts", []):
             name = acc.get("name", "")
             sel = "●" if name == active else "○"
