@@ -155,23 +155,37 @@ def mask_key(key: str) -> str:
 
 
 def ping_model_quota(key: str, model_id: str) -> dict | None:
-    """Ping Groq API to retrieve rate‑limit headers for *model_id*.
+    """Ping Groq chat completions endpoint to retrieve rate-limit headers.
+
+    /models does not return rate-limit headers; a real inference call is needed.
+    We use max_tokens=1 to minimise cost.
     """
-    url = "https://api.groq.com/openai/v1/models"
-    headers = {"Authorization": f"Bearer {key}"}
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+    payload = {
+        "model": model_id,
+        "messages": [{"role": "user", "content": "hi"}],
+        "max_tokens": 1,
+    }
     try:
-        response = httpx.get(url, headers=headers, timeout=10.0)
-        if response.status_code != 200:
+        response = httpx.post(url, headers=headers, json=payload, timeout=15.0)
+        if response.status_code not in (200, 429):
             return None
+
         def _int(name: str) -> int | None:
             v = response.headers.get(name)
-            return int(v) if v and v.isdigit() else None
+            if v is None:
+                return None
+            try:
+                return int(v)
+            except ValueError:
+                return None
+
         rpd_limit = _int("x-ratelimit-limit-requests")
         rpd_remaining = _int("x-ratelimit-remaining-requests")
         tpm_limit = _int("x-ratelimit-limit-tokens")
         tpm_remaining = _int("x-ratelimit-remaining-tokens")
-        if None in (rpd_limit, rpd_remaining, tpm_limit, tpm_remaining):
-            return None
+        # Return partial data even if some headers are missing
         return {
             "rpd_limit": rpd_limit,
             "rpd_remaining": rpd_remaining,
