@@ -1,3 +1,5 @@
+![Groq Account Switcher](img/P1.png)
+
 # Groq Account Switcher
 
 A Windows terminal UI (TUI) built with [Textual](https://textual.textualize.io/) for managing multiple Groq API accounts and switching between them instantly. Designed primarily to streamline free-tier key rotation and quota management across local development environments.
