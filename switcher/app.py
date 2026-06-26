@@ -78,7 +78,7 @@ def _fmt_dt(iso: str | None) -> str:
         return "—"
     try:
         dt = datetime.fromisoformat(iso)
-        return dt.strftime("%Y-%m-%d %H:%M")
+        return dt.astimezone().strftime("%Y-%m-%d %H:%M")
     except Exception:
         return iso
 
