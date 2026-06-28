@@ -351,6 +351,7 @@ class GroqSwitcherApp(App):
         tbl: DataTable = self.query_one("#tbl-models", DataTable)
         tbl.clear()
         filtered = _filter_models(self._all_models, self._model_type)
+        filtered = sorted(filtered, key=lambda x: x["id"].lower())
         active_name = get_active_account_name()
         data = load_accounts()
         quota_cache: dict[str, dict] = {}
